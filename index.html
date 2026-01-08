@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KMC System V29.0 (Merged & Reverted)</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #2563eb; --primary-dark: #1e40af; --bg: #f8fafc; --surface: #ffffff;
+            --text-main: #1e293b; --text-sub: #64748b; --border: #e2e8f0; --danger: #ef4444; --success: #10b981;
+            --radius: 12px; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); --nav-height: 70px;
+        }
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); padding-bottom: 90px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        .hidden { display: none !important; }
+        .flex { display: flex; } .flex-col { flex-direction: column; } .w-full { width: 100%; } .gap-10 { gap: 10px; }
+
+        #pdf-export-container { position: absolute; top: -9999px; left: -9999px; width: 1000px; background: white; padding: 30px; font-family: 'Inter', sans-serif; }
+        #pdf-export-container table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        #pdf-export-container th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; color: #334155; text-align: center; }
+        #pdf-export-container td { border: 1px solid #e2e8f0; padding: 8px; font-size: 12px; color: #0f172a; text-align: center; vertical-align: middle; }
+
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .login-box { background: rgba(255,255,255,0.96); backdrop-filter: blur(10px); width: 100%; max-width: 360px; padding: 30px; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+        
+        .header { background: rgba(255,255,255,0.9); backdrop-filter: blur(8px); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); z-index: 20; border-bottom: 1px solid #e2e8f0; }
+        .brand { font-size: 18px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .role-badge { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 700; background: #e0e7ff; color: var(--primary); }
+        
+        .view-container { flex: 1; overflow-y: auto; padding: 15px; display: none; scroll-behavior: smooth; }
+        .view-container.active { display: block; animation: fadeUp 0.3s ease-out; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .card { background: var(--surface); border-radius: var(--radius); padding: 20px; margin-bottom: 15px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+        .card-header { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); padding-left: 10px; }
+        
+        .form-group { margin-bottom: 15px; transition: all 0.3s; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-sub); }
+        .req-star { color: var(--danger); margin-left: 4px; display: none; }
+        .form-input, .form-select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: #fff; transition: border 0.2s; }
+        .form-input:focus { border-color: var(--primary); outline: none; }
+        
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; margin-bottom: 10px; transition: opacity 0.2s; }
+        .btn:active { opacity: 0.8; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-sub); }
+        
+        .data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+        .data-table th { text-align: left; padding: 10px; background: #f1f5f9; color: var(--text-sub); font-weight: 600; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        .data-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; color: var(--text-main); }
+        
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-content { background: #fff; width: 92%; max-width: 600px; border-radius: 20px; padding: 20px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .nav-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); height: var(--nav-height); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
+        .nav-item { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 10px; color: #94a3b8; cursor: pointer; transition: 0.2s; }
+        .nav-item.active { color: var(--primary); transform: translateY(-2px); font-weight: 600; } .nav-item i { font-size: 20px; margin-bottom: 4px; }
+
+        .media-box { height: 100px; border: 2px dashed #cbd5e1; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; color: #94a3b8; position: relative; overflow: hidden; }
+        .media-preview { width: 100%; height: 100%; object-fit: contain; position: absolute; top:0; left:0; background: #fff; }
+        
+        .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+        .switch-input { width: 22px; height: 22px; accent-color: var(--primary); cursor: pointer; }
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .stat-item { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 15px 5px; text-align: center; }
+        .stat-val { font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
+
+        #toast-box { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; width: 90%; max-width: 350px; pointer-events: none; }
+        .toast { background: #fff; padding: 12px 16px; border-radius: 50px; font-size: 13px; font-weight: 600; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-left: 4px solid var(--primary); animation: slideDown 0.3s; pointer-events: auto; }
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        #loading { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); backdrop-filter: blur(2px); z-index:6000; display:none; justify-content:center; align-items:center; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .tab-header { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid var(--border); }
+        .tab-btn { padding: 10px 15px; font-size: 13px; font-weight: 600; color: var(--text-sub); cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        
+        /* V27 style date input groups */
+        .date-input-group { flex: 1; display: flex; flex-direction: column; }
+        .date-input-group label { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <div id="toast-box"></div>
+    <div id="loading"><div class="spinner"></div></div>
+    
+    <div id="pdf-export-container">
+        <h2 style="text-align:center; color:#1e3a8a; margin-bottom:10px;">KMC Logistics Report</h2>
+        <div style="text-align:center; color:#666; font-size:12px; margin-bottom:20px;" id="pdf-date-range"></div>
+        <table style="width:100%; border-collapse:collapse; font-size:10px;">
+            <thead style="background:#f3f4f6;">
+                <tr>
+                    <th data-i18n="col_date">Date</th>
+                    <th data-i18n="col_type">Type</th>
+                    <th data-i18n="col_name">Name</th>
+                    <th data-i18n="col_qty">Qty</th>
+                    <th data-i18n="col_loc">Location</th>
+                    <th data-i18n="col_fixed">Fixed</th>
+                    <th data-i18n="col_remark">Remark</th>
+                    <th data-i18n="col_proof">Proof</th>
+                </tr>
+            </thead>
+            <tbody id="pdf-table-body"></tbody>
+        </table>
+    </div>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <div style="text-align:center;margin-bottom:20px;"><i class="fas fa-cube" style="font-size:40px;color:var(--primary)"></i></div>
+            <h2 style="text-align:center;color:var(--text-main);margin-bottom:5px;">KMC System</h2>
+            <p style="text-align:center;color:var(--text-sub);font-size:12px;margin-bottom:30px;">V29.0 Final</p>
+            <div class="form-group"><label class="form-label" data-i18n="role">Role</label><select id="login-role" class="form-select"><option value="manager" data-i18n="role_manager">Manager</option><option value="admin" data-i18n="role_admin">Admin</option></select></div>
+            <div class="form-group"><label class="form-label" data-i18n="pass">Password</label><input type="password" id="login-pass" class="form-input"></div>
+            <button class="btn btn-primary" onclick="app.login()" data-i18n="btn_login">Login</button>
+            <div style="text-align:center;margin-top:20px;font-size:12px;color:var(--text-sub);cursor:pointer" onclick="app.toggleLang()">EN / 中文</div>
+        </div>
+    </div>
+
+    <header class="header">
+        <div class="brand"><i class="fas fa-cube"></i> KMC <span id="role-badge" class="role-badge"></span></div>
+        <div class="flex" style="gap:15px;align-items:center;"><i class="fas fa-sync-alt" style="color:var(--primary);cursor:pointer" onclick="app.sync(true)"></i><span style="font-size:12px;font-weight:600;color:var(--primary);cursor:pointer" onclick="app.toggleLang()">CN/EN</span></div>
+    </header>
+
+    <div id="view-dash" class="view-container active">
+        <div class="card">
+            <div class="card-header"><span data-i18n="overview">Overview</span> <i class="fas fa-chart-pie" style="color:#cbd5e1"></i></div>
+            <div class="stat-grid">
+                <div class="stat-item" onclick="app.showDetail('stock')"><div class="stat-val" id="stat-total">0</div><div style="font-size:11px" data-i18n="lbl_total">Total</div></div>
+                <div class="stat-item" onclick="app.showDetail('in')"><div class="stat-val" style="color:var(--success)" id="stat-in">0</div><div style="font-size:11px" data-i18n="lbl_in">In</div></div>
+                <div class="stat-item" onclick="app.showDetail('out')"><div class="stat-val" style="color:var(--primary)" id="stat-out">0</div><div style="font-size:11px" data-i18n="lbl_out">Out</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-items" class="view-container">
+        <div class="card">
+            <div class="card-header"><span data-i18n="items">Items</span> <i class="fas fa-list" style="color:#cbd5e1"></i></div>
+            <div class="flex gap-10" style="margin-bottom:15px;"><input id="search" class="form-input" style="flex:2" data-placeholder="ph_search" oninput="app.renderList()"><select id="filter" class="form-select" style="flex:1" onchange="app.renderList()"></select></div>
+            <div style="max-height:60vh;overflow-y:auto;border:1px solid #f1f5f9;border-radius:12px;">
+                <table class="data-table"><thead><tr><th data-i18n="col_name">Name</th><th data-i18n="col_qty">Qty</th><th data-i18n="col_loc">Loc</th><th data-i18n="col_fixed">Fixed</th></tr></thead><tbody id="list-body"></tbody></table>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-in" class="view-container">
+        <div class="card">
+            <div class="card-header"><span data-i18n="inbound">Inbound</span> <i class="fas fa-arrow-down" style="color:var(--success)"></i></div>
+            <div class="form-group"><label class="form-label"><span data-i18n="name">Name</span><span class="req-star">*</span></label><input type="text" id="in-name" class="form-input" list="name-list"></div>
+            <div class="flex gap-10"><div class="form-group" style="flex:1"><label class="form-label"><span data-i18n="cat">Cat</span><span class="req-star">*</span></label><select id="in-cat" class="form-select"></select></div><div class="form-group" style="flex:1"><label class="form-label"><span data-i18n="qty">Qty</span><span class="req-star">*</span></label><input type="number" id="in-qty" class="form-input" min="1"></div></div>
+            
+            <div class="flex gap-10">
+                <div class="form-group" style="flex:1" id="grp-in-unit"><label class="form-label"><span data-i18n="unit">Unit</span><span class="req-star" id="req-star-unit">*</span></label><select id="in-unit" class="form-select"></select></div>
+                <div class="form-group" style="flex:1" id="grp-in-attr"><label class="form-label"><span data-i18n="attr">Attr</span><span class="req-star" id="req-star-attr">*</span></label><select id="in-attr" class="form-select"></select></div>
+            </div>
+            
+            <div class="form-group" id="grp-in-loc"><label class="form-label"><span data-i18n="loc">Location</span><span class="req-star" id="req-star-loc">*</span></label><input type="text" id="in-loc" class="form-input" data-placeholder="ph_loc"></div>
+
+            <div class="flex gap-10" id="grp-in-fixed-asset">
+                <div class="form-group" style="flex:1"><label class="form-label"><span data-i18n="fixed_asset">Fixed</span><span class="req-star" id="req-star-fixed-asset">*</span></label><select id="in-fixed" class="form-select"></select></div>
+                <div class="form-group" style="flex:1"><label class="form-label"><span data-i18n="code">Code</span><span class="req-star" id="req-star-fixed-asset">*</span></label><input type="text" id="in-code" class="form-input" data-placeholder="ph_code"></div>
+            </div>
+
+            <div class="form-group" id="grp-in-remark"><label class="form-label"><span data-i18n="remark">Remark</span><span class="req-star" id="req-star-remark">*</span></label><input type="text" id="in-remark" class="form-input" data-placeholder="ph_remark"></div>
+            
+            <div class="form-group" id="grp-in-photo"><label class="form-label"><span data-i18n="photo">Photo</span><span class="req-star" id="req-star-photo">*</span></label><div class="media-box" onclick="document.getElementById('in-file').click()"><img id="in-img-p" class="media-preview hidden"><i class="fas fa-camera" style="font-size:24px;margin-bottom:5px;"></i><span style="font-size:12px">Upload</span><input type="file" id="in-file" accept="image/*" class="hidden" onchange="app.handleFile(this,'in')"></div></div>
+            <button class="btn btn-success" onclick="app.submitIn()"><i class="fas fa-check"></i> <span data-i18n="btn_submit_in">Submit</span></button>
+        </div>
+    </div>
+
+    <div id="view-out" class="view-container">
+        <div class="card">
+            <div class="card-header"><span data-i18n="outbound">Outbound</span> <i class="fas fa-arrow-up" style="color:var(--primary)"></i></div>
+            <div class="form-group"><label class="form-label"><span data-i18n="name">Name</span><span class="req-star">*</span></label><input type="text" id="out-name" class="form-input" list="name-list" onchange="app.checkStock(this.value)"></div><div id="stock-hint" style="font-size:12px;color:var(--danger);margin-bottom:10px;font-weight:600"></div>
+            <div class="flex gap-10"><div class="form-group" style="flex:1"><label class="form-label"><span data-i18n="qty">Qty</span><span class="req-star">*</span></label><input type="number" id="out-qty" class="form-input" min="1"></div><div class="form-group" style="flex:1"><label class="form-label"><span data-i18n="dept">Dept</span><span class="req-star">*</span></label><select id="out-dept" class="form-select"></select></div></div>
+            
+            <div class="form-group" id="grp-out-receiver"><label class="form-label"><span data-i18n="receiver">Receiver</span><span class="req-star" id="req-star-receiver">*</span></label><input type="text" id="out-receiver" class="form-input"></div>
+            <div class="form-group" id="grp-out-sign"><label class="form-label"><span data-i18n="sign">Sign</span><span class="req-star" id="req-star-sign">*</span></label><div class="media-box" onclick="app.openSign()"><img id="out-sig-p" class="media-preview hidden"><i class="fas fa-pen-nib" style="font-size:24px;margin-bottom:5px;"></i><span style="font-size:12px">Sign</span></div></div>
+            <button class="btn btn-primary" onclick="app.submitOut()"><i class="fas fa-paper-plane"></i> <span data-i18n="btn_submit_out">Submit</span></button>
+        </div>
+    </div>
+
+    <div id="view-tools" class="view-container">
+        <div class="card">
+            <div class="card-header"><span data-i18n="tools">Tools</span> <i class="fas fa-tools" style="color:#cbd5e1"></i></div>
+            <div style="background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:20px;border:1px solid #f1f5f9;">
+                <h4 style="margin:0 0 10px 0;font-size:13px;color:var(--text-sub);text-transform:uppercase;" data-i18n="report_export">Report</h4>
+                <div class="flex gap-10" style="margin-bottom:10px;">
+                    <div class="date-input-group"><label data-i18n="lbl_start_date">Start</label><input type="date" id="r-start" class="form-input"></div>
+                    <div class="date-input-group"><label data-i18n="lbl_end_date">End</label><input type="date" id="r-end" class="form-input"></div>
+                </div>
+                <div class="flex gap-10">
+                    <button class="btn btn-outline" style="flex:1;margin:0" onclick="app.previewReport()"><i class="fas fa-eye"></i> <span data-i18n="btn_preview">View</span></button>
+                    <button class="btn btn-success" style="flex:1;margin:0" onclick="app.exportExcel()"><i class="fas fa-file-excel"></i> <span data-i18n="btn_excel">Excel</span></button>
+                    <button class="btn btn-danger" style="flex:1;margin:0" onclick="app.exportPDF()"><i class="fas fa-file-pdf"></i> <span data-i18n="btn_pdf">PDF</span></button>
+                </div>
+            </div>
+            
+            <div id="admin-panel" class="hidden" style="background:#fff7ed;border:1px solid #ffedd5;padding:15px;border-radius:12px;margin-bottom:20px;">
+                <h4 style="margin:0 0 10px 0;color:#9a3412;font-size:13px;text-transform:uppercase;" data-i18n="admin_set">Settings</h4>
+                <div style="margin-bottom:15px;background:#fff;padding:10px;border-radius:8px;">
+                    <div style="font-size:12px;font-weight:700;margin-bottom:5px;" data-i18n="mgr_perm">Permissions:</div>
+                    <div class="switch-row"><span data-i18n="allow_in">Inbound</span><input type="checkbox" id="perm-in" class="switch-input" onchange="app.saveSettings()"></div>
+                    <div class="switch-row"><span data-i18n="allow_out">Outbound</span><input type="checkbox" id="perm-out" class="switch-input" onchange="app.saveSettings()"></div>
+                    <div class="switch-row"><span data-i18n="allow_edit">Edit</span><input type="checkbox" id="perm-edit" class="switch-input" onchange="app.saveSettings()"></div>
+                </div>
+                <div style="margin-bottom:15px;background:#fff;padding:10px;border-radius:8px;">
+                    <div style="font-size:12px;font-weight:700;margin-bottom:5px;" data-i18n="req_fields">Field Settings (ON=Required/Show):</div>
+                    
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_photo">Photo</span><small style="color:#94a3b8;font-size:10px;" data-i18n="hint_photo">For Inbound</small></div><input type="checkbox" id="req-photo" class="switch-input" onchange="app.saveSettings()"></div>
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_unit">Unit</span></div><input type="checkbox" id="req-unit" class="switch-input" onchange="app.saveSettings()"></div>
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_fixed_asset">Fixed Asset & Code</span></div><input type="checkbox" id="req-fixed-asset" class="switch-input" onchange="app.saveSettings()"></div>
+                    
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_attr">Attr</span></div><input type="checkbox" id="req-attr" class="switch-input" onchange="app.saveSettings()"></div>
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_remark">Remark</span></div><input type="checkbox" id="req-remark" class="switch-input" onchange="app.saveSettings()"></div>
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_loc">Location</span></div><input type="checkbox" id="req-loc" class="switch-input" onchange="app.saveSettings()"></div>
+                    
+                    <hr style="border:0;border-top:1px dashed #eee;margin:10px 0;">
+                    
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_receiver">Receiver</span><small style="color:#94a3b8;font-size:10px;" data-i18n="hint_out">For Outbound</small></div><input type="checkbox" id="req-receiver" class="switch-input" onchange="app.saveSettings()"></div>
+                    <div class="switch-row"><div class="flex-col"><span data-i18n="req_sign">Signature</span><small style="color:#94a3b8;font-size:10px;" data-i18n="hint_out">For Outbound</small></div><input type="checkbox" id="req-sign" class="switch-input" onchange="app.saveSettings()"></div>
+                </div>
+                <button class="btn btn-primary" onclick="app.openPassModal()" style="margin-bottom:8px" data-i18n="btn_change_pass">Pass</button>
+                <button class="btn btn-outline" onclick="app.openAdvMgr()" style="background:#fff;border-color:#fed7aa;color:#9a3412" data-i18n="btn_adv_mgr">Super Admin</button>
+            </div>
+            <button class="btn btn-outline" onclick="location.reload()" data-i18n="btn_logout">Logout</button>
+        </div>
+    </div>
+
+    <nav class="nav-bar">
+        <div class="nav-item active" onclick="app.nav('dash')" id="nav-dash"><i class="fas fa-th-large"></i><span data-i18n="nav_dash">Dash</span></div>
+        <div class="nav-item" onclick="app.nav('items')" id="nav-items"><i class="fas fa-boxes"></i><span data-i18n="nav_items">Items</span></div>
+        <div class="nav-item" onclick="app.nav('in')" id="nav-in"><i class="fas fa-arrow-circle-down"></i><span data-i18n="nav_in">In</span></div>
+        <div class="nav-item" onclick="app.nav('out')" id="nav-out"><i class="fas fa-arrow-circle-up"></i><span data-i18n="nav_out">Out</span></div>
+        <div class="nav-item" onclick="app.nav('tools')" id="nav-tools"><i class="fas fa-tools"></i><span data-i18n="nav_tools">Tools</span></div>
+    </nav>
+
+    <div class="modal" id="modal-sign"><div class="modal-content" style="height:600px;display:flex;flex-direction:column;"><div class="card-header"><span data-i18n="title_sign">Sign</span> <i class="fas fa-times" onclick="app.closeModal('modal-sign')"></i></div><div style="flex:1;background:#f1f5f9;border-radius:12px;overflow:hidden;position:relative;" id="sig-pad"><canvas id="sig-c" style="width:100%;height:100%;touch-action:none;"></canvas></div><div class="flex gap-10" style="margin-top:15px;"><button class="btn btn-outline" style="margin:0" onclick="app.clearSig()" data-i18n="btn_clear">Clear</button><button class="btn btn-primary" style="margin:0" onclick="app.saveSig()" data-i18n="btn_confirm">OK</button></div></div></div>
+    
+    <div class="modal" id="modal-detail"><div class="modal-content" style="max-width:800px;"><div class="card-header"><span data-i18n="title_detail">Detail</span> <i class="fas fa-times" onclick="app.closeModal('modal-detail')"></i></div><div style="max-height:60vh;overflow-y:auto;border-radius:8px;border:1px solid #f1f5f9;"><table class="data-table"><thead><tr><th data-i18n="col_date">Date</th><th data-i18n="col_type">Type</th><th data-i18n="col_name">Name</th><th data-i18n="col_loc">Loc</th><th data-i18n="col_fixed">Fixed</th><th data-i18n="col_qty">Qty</th><th data-i18n="col_remark">Remark</th><th data-i18n="col_proof">Proof</th></tr></thead><tbody id="dt-body"></tbody></table></div><button class="btn btn-outline" style="margin-top:15px;margin-bottom:0" onclick="app.closeModal('modal-detail')" data-i18n="btn_close">Close</button></div></div>
+
+    <div class="modal" id="modal-pass"><div class="modal-content"><div class="card-header"><span data-i18n="title_pass">Pass</span> <i class="fas fa-times" onclick="app.closeModal('modal-pass')"></i></div><div class="form-group"><label class="form-label" data-i18n="lbl_admin_pass">New Admin</label><input type="text" id="new-admin-pass" class="form-input"></div><div class="form-group"><label class="form-label" data-i18n="lbl_mgr_pass">New Manager</label><input type="text" id="new-mgr-pass" class="form-input"></div><button class="btn btn-primary" onclick="app.savePass()" style="margin:0" data-i18n="btn_save">Save</button></div></div>
+    <div class="modal" id="modal-edit"><div class="modal-content"><div class="card-header"><span data-i18n="title_edit">Edit</span> <i class="fas fa-times" onclick="app.closeModal('modal-edit')"></i></div><h4 id="edit-name" style="text-align:center;"></h4><div style="display:flex;justify-content:center;margin-bottom:20px;"><input type="number" id="edit-qty" class="form-input" style="width:100px;text-align:center;font-size:24px;font-weight:700;"></div><button class="btn btn-primary" onclick="app.confirmEdit()" style="margin:0" data-i18n="btn_confirm">Confirm</button></div></div>
+
+    <div class="modal" id="modal-adv"><div class="modal-content" style="max-width:750px;"><div class="card-header"><span data-i18n="title_adv">Master Data</span> <i class="fas fa-times" onclick="app.closeModal('modal-adv')"></i></div><div class="tab-header"><div class="tab-btn active" onclick="app.switchTab('stock')" data-i18n="tab_stock">Stock</div><div class="tab-btn" onclick="app.switchTab('history')" data-i18n="tab_history">Logs</div></div><div id="tab-stock" class="tab-content active"><input id="adv-search" class="form-input" data-placeholder="ph_search" placeholder="Search..." oninput="app.renderAdv()" style="margin-bottom:10px;"><div style="max-height:50vh;overflow-y:auto;border:1px solid #f1f5f9;border-radius:12px;"><table class="data-table"><thead><tr><th data-i18n="col_name">Name</th><th data-i18n="col_loc">Loc</th><th data-i18n="col_qty">Qty</th><th data-i18n="col_act">Act</th></tr></thead><tbody id="adv-body"></tbody></table></div></div><div id="tab-history" class="tab-content"><div style="background:#fef2f2;color:#991b1b;padding:8px;font-size:11px;border-radius:8px;margin-bottom:10px;"><i class="fas fa-exclamation-triangle"></i> <span data-i18n="msg_adv_warn">Super Admin Mode</span></div><input id="hist-search" class="form-input" data-placeholder="ph_search_log" placeholder="Search Logs..." oninput="app.renderAdvHistory()" style="margin-bottom:10px;"><div style="max-height:50vh;overflow-y:auto;border:1px solid #f1f5f9;border-radius:12px;"><table class="data-table"><thead><tr><th data-i18n="col_date">Date</th><th data-i18n="col_name">Name</th><th data-i18n="col_qty">Qty</th><th data-i18n="col_proof">Proof</th><th data-i18n="col_act">Act</th></tr></thead><tbody id="adv-hist-body"></tbody></table></div></div></div></div>
+
+    <div class="modal" id="modal-item-editor"><div class="modal-content"><div class="card-header"><span data-i18n="title_edit_item">Edit Item</span> <i class="fas fa-times" onclick="app.closeModal('modal-item-editor')"></i></div><div class="form-group"><label data-i18n="lbl_name">Name</label><input id="editor-name" class="form-input"></div><div class="form-group"><label data-i18n="lbl_qty">Qty</label><input id="editor-qty" class="form-input"></div><div class="form-group"><label data-i18n="loc">Loc</label><input id="editor-loc" class="form-input"></div><div class="form-group"><label data-i18n="fixed_asset">Fixed</label><select id="editor-fixed" class="form-select"></select></div><button class="btn btn-primary" onclick="app.advSaveItem()" data-i18n="btn_save">Save</button></div></div>
+    <div class="modal" id="modal-log-editor">
+        <div class="modal-content">
+            <div class="card-header"><span data-i18n="title_edit_log">Edit Log</span> <i class="fas fa-times" onclick="app.closeModal('modal-log-editor')"></i></div>
+            <div class="form-group"><label data-i18n="col_date">Time</label><input type="datetime-local" id="log-date" class="form-input"></div>
+            <div class="form-group"><label data-i18n="col_name">Name</label><input id="log-name" class="form-input"></div>
+            <div class="form-group"><label data-i18n="col_qty">Qty</label><input id="log-qty" class="form-input"></div>
+            <div class="form-group"><label data-i18n="col_type">Type</label><select id="log-type" class="form-select"><option value="IN">IN</option><option value="OUT">OUT</option><option value="ADJ_ADD">ADJ_ADD</option><option value="ADJ_SUB">ADJ_SUB</option></select></div>
+            <div class="form-group"><label data-i18n="col_remark">Remark</label><input id="log-remark" class="form-input"></div>
+            <div style="border-top:1px solid #eee; margin-top:10px; padding-top:10px;">
+                <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:5px;">Proof Management</label>
+                <div id="log-proof-preview" style="margin-bottom:5px; max-height:100px; overflow:hidden;"></div>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn btn-danger btn-outline" style="flex:1; font-size:11px;" onclick="app.removeLogProof()">Remove</button>
+                    <div style="position:relative; flex:1; overflow:hidden;">
+                        <button class="btn btn-primary btn-outline" style="width:100%; font-size:11px;">Upload/Replace</button>
+                        <input type="file" id="log-edit-file" style="position:absolute;top:0;left:0;opacity:0;width:100%;height:100%;" onchange="app.handleLogEditFile(this)">
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:15px" onclick="app.saveLogEdit()" data-i18n="btn_save">Save</button>
+        </div>
+    </div>
+
+    <datalist id="name-list"></datalist>
+
+    <script>
+        const app = {
+            config: { binId: "695da8b5d0ea881f40596326", apiKey: "$2a$10$58BViN4WkYRD/Xkrsb.16ug/ZY78uY8hLcInF4A3hfxDIoMWA53nu" },
+            defaultData: {
+                list: [], history: [], lock: { ts: 0, user: '' },
+                settings: { 
+                    adminPass: 'admin123', mgrPass: '666666', 
+                    perms: { in: true, out: true, edit: false }, 
+                    reqFields: { unit: true, code: true, attr: true, remark: true, location: true, fixedAsset: false, photo: true, receiver: true, sign: true } 
+                }
+            },
+            data: null, user: null, lang: 'zh', SUPER_PASS: 'sqx1987923', currentLogIdx: null,
+            cats: ['通用 (General)', '办公 (Office)', '劳保 (PPE)', '工具 (Tools)', '其他 (Other)'],
+            depts: ['财务部 (Finance)', '综合部 (Admin Dept)', '安全生产部 (Safety Dept)', '质量技术部 (Quality Dept)', '后勤部 (Logistics)', '业务部 (Business Dept)', '采矿部 (Mining)', '机电工程部 (ME Dept)', '选厂 (Processing)'],
+            units: ['个 (Pcs)', '箱 (Box)', 'kg (kg)', '台 (Unit)', '套 (Set)', '包 (Pack)', '米 (Meter)', '双 (Pair)', '件 (Item)', '升 (L)'],
+            attrs: ['消耗品 (Consumable)', '固定资产 (Fixed Asset)', '借用物 (Borrowed)', '低值易耗 (Low Value)', '其他 (Other)'],
+            temp: { img: null, sig: null, editId: null, logEditImg: null },
+            
+            dict: {
+                zh: {
+                    role:"身份", role_manager:"库管员", role_admin:"管理员", pass:"密码", btn_login:"登录",
+                    overview:"概览数据", lbl_total:"库存总数", lbl_in:"今日入库", lbl_out:"今日出库",
+                    items:"物资列表", ph_search:"搜索...", col_name:"名称", col_cat:"分类", col_qty:"数量", col_code:"资产编码", col_loc:"位置", col_fixed:"固资", col_type:"类型", col_proof:"凭证",
+                    inbound:"入库登记", name:"物资名称", cat:"分类", qty:"数量", photo:"照片凭证", btn_submit_in:"提交入库",
+                    unit:"单位", code:"资产编码", attr:"属性", remark:"备注", loc:"存放位置", fixed_asset:"是否固定资产", ph_loc:"例如: A-01架",
+                    outbound:"出库登记", dept:"部门", receiver:"领用人", sign:"签字", btn_submit_out:"提交出库",
+                    tools:"管理工具", report_export:"报表导出", btn_preview:"预览", btn_excel:"导出 Excel", btn_pdf:"导出 PDF",
+                    lbl_start_date:"开始日期", lbl_end_date:"结束日期",
+                    admin_set:"管理员设置", mgr_perm:"库管员权限:", allow_in:"允许入库", allow_out:"允许出库", allow_edit:"允许修改",
+                    req_fields:"必填项配置 (开启=显示并必填，关闭=隐藏):", req_unit:"单位", req_code:"资产编码", req_attr:"属性", req_remark:"备注", req_loc:"位置", req_fixed_asset:"固定资产与编码",
+                    req_photo:"照片", req_receiver:"领用人", req_sign:"签字",
+                    btn_change_pass:"修改密码", btn_adv_mgr:"高级数据管理", btn_logout:"退出登录",
+                    nav_dash:"概览", nav_items:"物资", nav_in:"入库", nav_out:"出库", nav_tools:"工具",
+                    title_sign:"签字", btn_clear:"重写", btn_confirm:"确认",
+                    title_detail:"详情", col_date:"日期", col_remark:"备注", btn_close:"关闭",
+                    title_pass:"修改密码", lbl_admin_pass:"管理员新密码", lbl_mgr_pass:"库管员新密码", btn_save:"保存",
+                    title_adv:"高级数据管理", col_act:"操作", title_edit:"编辑库存", title_edit_item:"编辑物资", title_edit_log:"编辑日志",
+                    msg_success:"操作成功", msg_fail:"操作失败", msg_fill:"请填写完整", msg_req:"为必填项", msg_no_perm:"无权限", msg_stock_low:"库存不足", msg_adv_warn:"超级管理员模式 (谨慎操作)",
+                    val_in:"入库", val_out:"出库", tab_stock:"当前库存", tab_history:"历史记录",
+                    val_yes:"是 (Yes)", val_no:"否 (No)", lbl_name:"名称", lbl_qty:"数量", lbl_date:"时间", lbl_cat:"分类",
+                    ph_search_log:"搜索日志...", ph_code:"选填", ph_remark:"选填",
+                    hint_photo:"入库时校验", hint_out:"出库时校验"
+                },
+                en: {
+                    role:"Role", role_manager:"Manager", role_admin:"Admin", pass:"Password", btn_login:"Login",
+                    overview:"Overview", lbl_total:"Total Stock", lbl_in:"Today In", lbl_out:"Today Out",
+                    items:"Items List", ph_search:"Search...", col_name:"Name", col_cat:"Cat", col_qty:"Qty", col_code:"Asset Code", col_loc:"Loc", col_fixed:"Fixed", col_type:"Type", col_proof:"Proof",
+                    inbound:"Inbound", name:"Item Name", cat:"Category", qty:"Quantity", photo:"Photo", btn_submit_in:"Submit In",
+                    unit:"Unit", code:"Asset Code", attr:"Attribute", remark:"Remark", loc:"Location", fixed_asset:"Fixed Asset", ph_loc:"e.g. Shelf A-01",
+                    outbound:"Outbound", dept:"Dept", receiver:"Receiver", sign:"Signature", btn_submit_out:"Submit Out",
+                    tools:"Tools", report_export:"Report Export", btn_preview:"Preview", btn_excel:"Export Excel", btn_pdf:"Export PDF",
+                    lbl_start_date:"Start Date", lbl_end_date:"End Date",
+                    admin_set:"Admin Settings", mgr_perm:"Manager Permissions:", allow_in:"Inbound", allow_out:"Outbound", allow_edit:"Edit",
+                    req_fields:"Required Fields (ON=Show/Req, OFF=Hide):", req_unit:"Unit", req_code:"Code", req_attr:"Attr", req_remark:"Remark", req_loc:"Location", req_fixed_asset:"Fixed Asset & Code",
+                    req_photo:"Photo", req_receiver:"Receiver", req_sign:"Sign",
+                    btn_change_pass:"Change Pass", btn_adv_mgr:"Master Data", btn_logout:"Logout",
+                    nav_dash:"Dash", nav_items:"Items", nav_in:"In", nav_out:"Out", nav_tools:"Tools",
+                    title_sign:"Sign", btn_clear:"Clear", btn_confirm:"Confirm",
+                    title_detail:"Detail", col_date:"Date", col_remark:"Remark", btn_close:"Close",
+                    title_pass:"Change Password", lbl_admin_pass:"New Admin Pass", lbl_mgr_pass:"New Manager Pass", btn_save:"Save",
+                    title_adv:"Master Data", col_act:"Action", title_edit:"Edit Stock", title_edit_item:"Edit Item", title_edit_log:"Edit Log",
+                    msg_success:"Success", msg_fail:"Failed", msg_fill:"Fill All", msg_req:"is required", msg_no_perm:"No Perm", msg_stock_low:"Stock Low", msg_adv_warn:"Super Admin Mode (Be Careful)",
+                    val_in:"In", val_out:"Out", tab_stock:"Current Stock", tab_history:"History Logs",
+                    val_yes:"Yes", val_no:"No", lbl_name:"Name", lbl_qty:"Qty", lbl_date:"Time", lbl_cat:"Cat",
+                    ph_search_log:"Search Logs...", ph_code:"Optional", ph_remark:"Optional",
+                    hint_photo:"For Inbound", hint_out:"For Outbound"
+                }
+            },
+
+            t: function(k) { return this.dict[this.lang][k] || k; },
+
+            init: function() {
+                const populate = (id, arr) => document.getElementById(id).innerHTML = arr.map(x=>`<option value="${x}">${x}</option>`).join('');
+                populate('in-cat', this.cats); populate('in-unit', this.units); populate('in-attr', this.attrs); 
+                populate('editor-cat', this.cats);
+                this.updateDeptDropdown();
+                document.getElementById('filter').innerHTML = `<option value="ALL">All</option>` + this.cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+                
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('r-start').value = today; document.getElementById('r-end').value = today;
+                this.i18n();
+            },
+
+            updateDeptDropdown: function() {
+                const deptSel = document.getElementById('out-dept');
+                deptSel.innerHTML = this.depts.map(d => `<option value="${d}">${d}</option>`).join('');
+            },
+
+            atomicUpdate: async function(actionCallback) {
+                this.loading(true);
+                try {
+                    const res = await fetch(`https://api.jsonbin.io/v3/b/${this.config.binId}/latest`, { headers: { 'X-Access-Key': this.config.apiKey } });
+                    const json = await res.json();
+                    this.data = { ...this.defaultData, ...json.record };
+                    // Patch settings for merged field
+                    if(!this.data.settings.reqFields) this.data.settings.reqFields = this.defaultData.settings.reqFields;
+                    // Migrate old 'code' or 'fixed' to 'fixedAsset' if present
+                    if(this.data.settings.reqFields.code === undefined && this.data.settings.reqFields.fixedAsset === undefined) {
+                         // assume default
+                         this.data.settings.reqFields.fixedAsset = false;
+                    }
+                    
+                    const result = actionCallback(this.data);
+                    if(result === false) { this.loading(false); return; }
+                    this.data.lock = { ts: Date.now(), user: this.user ? this.user.role : 'sys' };
+                    const saveRes = await fetch(`https://api.jsonbin.io/v3/b/${this.config.binId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'X-Access-Key': this.config.apiKey },
+                        body: JSON.stringify(this.data)
+                    });
+                    if(!saveRes.ok) throw new Error("Save Failed");
+                    this.refreshUI();
+                    this.toast(this.t('msg_success'), 'success');
+                } catch(e) { this.toast(this.t('msg_fail'), 'error'); } 
+                finally { this.loading(false); }
+            },
+
+            sync: async function(manual) {
+                this.loading(true);
+                try {
+                    const res = await fetch(`https://api.jsonbin.io/v3/b/${this.config.binId}/latest`, { headers: { 'X-Access-Key': this.config.apiKey } });
+                    const json = await res.json();
+                    this.data = { ...this.defaultData, ...json.record };
+                    if(!this.data.settings.reqFields) this.data.settings.reqFields = this.defaultData.settings.reqFields;
+                    this.refreshUI();
+                    if(manual) this.toast(this.t('msg_success'));
+                } catch(e) { this.toast(this.t('msg_fail'), 'error'); } 
+                finally { this.loading(false); }
+            },
+
+            login: async function() {
+                const role = document.getElementById('login-role').value;
+                const pass = document.getElementById('login-pass').value;
+                this.loading(true);
+                await this.sync(false);
+                const now = Date.now();
+                if(role !== 'admin' && (now - this.data.lock.ts < 10000) && this.data.lock.user && this.data.lock.user !== role) {
+                    this.loading(false); return alert("System Busy (10s lock).");
+                }
+                const realAdminPass = this.data.settings.adminPass || 'admin123';
+                const realMgrPass = this.data.settings.mgrPass || '666666';
+                if(role === 'admin' && pass !== realAdminPass) { this.loading(false); return this.toast(this.t('msg_fail'), 'error'); }
+                if(role === 'manager' && pass !== realMgrPass) { this.loading(false); return this.toast(this.t('msg_fail'), 'error'); }
+
+                this.user = { role: role };
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('role-badge').innerText = this.t('role_' + role);
+                if(role === 'admin') {
+                    document.getElementById('admin-panel').classList.remove('hidden');
+                    document.getElementById('perm-in').checked = this.data.settings.perms.in;
+                    document.getElementById('perm-out').checked = this.data.settings.perms.out;
+                    document.getElementById('perm-edit').checked = this.data.settings.perms.edit;
+                    const rf = this.data.settings.reqFields;
+                    document.getElementById('req-unit').checked = rf.unit;
+                    document.getElementById('req-fixed-asset').checked = rf.fixedAsset; // Merged
+                    document.getElementById('req-attr').checked = rf.attr;
+                    document.getElementById('req-remark').checked = rf.remark;
+                    document.getElementById('req-loc').checked = rf.location;
+                    document.getElementById('req-photo').checked = rf.photo;
+                    document.getElementById('req-receiver').checked = rf.receiver;
+                    document.getElementById('req-sign').checked = rf.sign;
+                }
+                this.atomicUpdate(() => {});
+            },
+
+            submitIn: function() {
+                if(this.user.role === 'manager' && !this.data.settings.perms.in) return this.toast(this.t('msg_no_perm'), 'error');
+                const name = document.getElementById('in-name').value.trim();
+                const qty = parseInt(document.getElementById('in-qty').value);
+                const cat = document.getElementById('in-cat').value;
+                const unit = document.getElementById('in-unit').value;
+                const code = document.getElementById('in-code').value.trim();
+                const attr = document.getElementById('in-attr').value;
+                const remark = document.getElementById('in-remark').value.trim();
+                const loc = document.getElementById('in-loc').value.trim();
+                const isFixed = document.getElementById('in-fixed').value;
+
+                if(!name || !qty || qty<=0) return this.toast(this.t('msg_fill'), 'error');
+                
+                const req = this.data.settings.reqFields;
+                if(req.photo && !this.temp.img) return this.toast(`${this.t('req_photo')} ${this.t('msg_req')}`, 'error');
+                if(req.unit && !unit) return this.toast(`${this.t('unit')} ${this.t('msg_req')}`, 'error');
+                if(req.attr && !attr) return this.toast(`${this.t('attr')} ${this.t('msg_req')}`, 'error');
+                if(req.remark && !remark) return this.toast(`${this.t('remark')} ${this.t('msg_req')}`, 'error');
+                if(req.location && !loc) return this.toast(`${this.t('loc')} ${this.t('msg_req')}`, 'error');
+                // Merged check
+                if(req.fixedAsset && !code) return this.toast(`${this.t('code')} ${this.t('msg_req')}`, 'error');
+
+                this.atomicUpdate((data) => {
+                    let item = data.list.find(i => i.name === name);
+                    if(item) { 
+                        item.qty += qty; 
+                        if(code) item.code = code; if(unit) item.unit = unit; if(attr) item.attr = attr;
+                        if(loc) item.loc = loc; item.isFixed = isFixed;
+                    } 
+                    else { data.list.unshift({ id: Date.now(), name, cat, qty, unit, code, attr, loc, isFixed }); }
+                    
+                    data.history.unshift({ ts: Date.now(), date: new Date().toLocaleString(), type: 'IN', name, qty, cat, unit, code, attr, remark, loc, isFixed, img: this.temp.img, user: this.user.role });
+                });
+                document.getElementById('in-name').value = ''; document.getElementById('in-qty').value = ''; 
+                document.getElementById('in-code').value = ''; document.getElementById('in-remark').value = ''; document.getElementById('in-loc').value = '';
+                this.temp.img = null; document.getElementById('in-img-p').classList.add('hidden');
+            },
+
+            submitOut: function() {
+                if(this.user.role === 'manager' && !this.data.settings.perms.out) return this.toast(this.t('msg_no_perm'), 'error');
+                const name = document.getElementById('out-name').value.trim();
+                const qty = parseInt(document.getElementById('out-qty').value);
+                const info = document.getElementById('out-dept').value + ' - ' + document.getElementById('out-receiver').value;
+                const receiver = document.getElementById('out-receiver').value.trim();
+                
+                if(!name || !qty || qty<=0) return this.toast(this.t('msg_fill'), 'error');
+                const req = this.data.settings.reqFields;
+                if(req.receiver && !receiver) return this.toast(`${this.t('req_receiver')} ${this.t('msg_req')}`, 'error');
+                if(req.sign && !this.temp.sig) return this.toast(`${this.t('req_sign')} ${this.t('msg_req')}`, 'error');
+
+                this.atomicUpdate((data) => {
+                    let item = data.list.find(i => i.name === name);
+                    if(!item || item.qty < qty) { alert(this.t('msg_stock_low')); return false; }
+                    item.qty -= qty;
+                    data.history.unshift({ ts: Date.now(), date: new Date().toLocaleString(), type: 'OUT', name, qty, info, sig: this.temp.sig, user: this.user.role });
+                });
+                document.getElementById('out-name').value = ''; document.getElementById('out-qty').value = ''; document.getElementById('out-receiver').value = '';
+                this.temp.sig = null; document.getElementById('out-sig-p').classList.add('hidden');
+            },
+
+            saveSettings: function() {
+                if(this.user.role !== 'admin') return;
+                this.atomicUpdate((data) => {
+                    data.settings.perms.in = document.getElementById('perm-in').checked;
+                    data.settings.perms.out = document.getElementById('perm-out').checked;
+                    data.settings.perms.edit = document.getElementById('perm-edit').checked;
+                    const rf = data.settings.reqFields;
+                    rf.unit = document.getElementById('req-unit').checked;
+                    rf.fixedAsset = document.getElementById('req-fixed-asset').checked; // Merged
+                    rf.attr = document.getElementById('req-attr').checked;
+                    rf.remark = document.getElementById('req-remark').checked;
+                    rf.location = document.getElementById('req-loc').checked;
+                    rf.photo = document.getElementById('req-photo').checked;
+                    rf.receiver = document.getElementById('req-receiver').checked;
+                    rf.sign = document.getElementById('req-sign').checked;
+                });
+            },
+            openPassModal: function() { document.getElementById('new-admin-pass').value = this.data.settings.adminPass; document.getElementById('new-mgr-pass').value = this.data.settings.mgrPass; document.getElementById('modal-pass').style.display = 'flex'; },
+            savePass: function() {
+                const na = document.getElementById('new-admin-pass').value; const nm = document.getElementById('new-mgr-pass').value;
+                if(!na || !nm) return this.toast(this.t('msg_fill'), 'error');
+                this.atomicUpdate((data) => { data.settings.adminPass = na; data.settings.mgrPass = nm; }); this.closeModal('modal-pass');
+            },
+            openAdvMgr: function() { const p = prompt("Super Admin Password:"); if(p !== this.SUPER_PASS) return this.toast(this.lang==='zh'?'密码错误':'Wrong Password', 'error'); this.sync(false); document.getElementById('modal-adv').style.display = 'flex'; this.switchTab('stock'); },
+            switchTab: function(t) { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active')); const btnIdx = t === 'stock' ? 0 : 1; document.querySelectorAll('#modal-adv .tab-btn')[btnIdx].classList.add('active'); document.getElementById('tab-'+t).classList.add('active'); if(t==='stock') this.renderAdv(); else this.renderAdvHistory(); },
+            renderAdv: function() { const s = document.getElementById('adv-search').value.toLowerCase(); document.getElementById('adv-body').innerHTML = this.data.list.filter(i => i.name.toLowerCase().includes(s)).map(i => `<tr><td>${i.name}</td><td>${i.loc||'-'}</td><td>${i.qty}</td><td><button class="btn btn-primary btn-sm" style="width:auto;padding:6px 12px;margin:0;" onclick="app.editItem(${i.id}, '${i.name}', ${i.qty}, '${i.loc||''}', '${i.isFixed||0}')"><i class="fas fa-pen"></i></button><button class="btn btn-danger btn-sm" style="width:auto;padding:6px 12px;margin:0;" onclick="app.delItem(${i.id})"><i class="fas fa-trash"></i></button></td></tr>`).join(''); },
+            renderAdvHistory: function() { const s = document.getElementById('hist-search').value.toLowerCase(); document.getElementById('adv-hist-body').innerHTML = this.data.history.map((h, idx) => ({h, idx})).filter(x => x.h.name.toLowerCase().includes(s)).map(x => `<tr><td>${x.h.date}</td><td>${x.h.name}</td><td>${x.h.qty}</td><td>${x.h.img?'Y':'N'}</td><td><button class="btn btn-primary btn-sm" style="width:auto;padding:6px 12px;margin:0;" onclick="app.editLog(${x.idx})"><i class="fas fa-pen"></i></button><button class="btn btn-danger btn-sm" style="width:auto;padding:6px 12px;margin:0;" onclick="app.delLog(${x.idx})"><i class="fas fa-trash"></i></button></td></tr>`).join(''); },
+            editItem: function(id, name, qty, loc, fixed) { this.temp.editId = id; document.getElementById('editor-name').value = name; document.getElementById('editor-qty').value = qty; document.getElementById('editor-loc').value = loc; document.getElementById('editor-fixed').value = fixed; document.getElementById('modal-item-editor').style.display = 'flex'; },
+            advSaveItem: function() { this.atomicUpdate((data) => { let item = data.list.find(i => i.id === this.temp.editId); if(item) { item.name = document.getElementById('editor-name').value; item.qty = parseInt(document.getElementById('editor-qty').value); item.loc = document.getElementById('editor-loc').value; item.isFixed = document.getElementById('editor-fixed').value; item.cat = document.getElementById('editor-cat').value; } }); this.closeModal('modal-item-editor'); this.renderAdv(); },
+            confirmEdit: function() { const q = parseInt(document.getElementById('edit-qty').value); this.atomicUpdate((data) => { let item = data.list.find(i => i.id === this.temp.editId); if(item) item.qty = q; }); this.closeModal('modal-edit'); if(document.getElementById('modal-adv').style.display === 'flex') this.renderAdv(); },
+            delItem: function(id) { if(!confirm('Delete?')) return; this.atomicUpdate((data) => { data.list = data.list.filter(i => i.id !== id); }); this.renderAdv(); },
+            editLog: function(idx) { 
+                this.currentLogIdx = idx; const log = this.data.history[idx]; 
+                const d = new Date(log.ts || log.date); const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); 
+                document.getElementById('log-date').value = iso; document.getElementById('log-name').value = log.name; 
+                document.getElementById('log-qty').value = log.qty; document.getElementById('log-remark').value = log.remark || ''; 
+                const proofDiv = document.getElementById('log-proof-preview');
+                proofDiv.innerHTML = log.img ? `<img src="${log.img}" style="height:80px">` : (log.sig ? `<img src="${log.sig}" style="height:50px">` : 'No Proof');
+                this.temp.logEditImg = null; 
+                document.getElementById('modal-log-editor').style.display = 'flex'; 
+            },
+            handleLogEditFile: function(inp) { const f = inp.files[0]; if(f) { const r = new FileReader(); r.onload = (e) => { this.temp.logEditImg = e.target.result; document.getElementById('log-proof-preview').innerHTML = `<img src="${e.target.result}" style="height:80px"> (New)`; }; r.readAsDataURL(f); } },
+            removeLogProof: function() { this.temp.logEditImg = 'REMOVE'; document.getElementById('log-proof-preview').innerHTML = 'Proof Removed (Save to Apply)'; },
+            saveLogEdit: function() { 
+                const newDate = new Date(document.getElementById('log-date').value); 
+                this.atomicUpdate((data) => { 
+                    const log = data.history[this.currentLogIdx]; 
+                    log.ts = newDate.getTime(); log.date = newDate.toLocaleString(); 
+                    log.name = document.getElementById('log-name').value; 
+                    log.qty = parseInt(document.getElementById('log-qty').value); 
+                    log.remark = document.getElementById('log-remark').value; 
+                    log.type = document.getElementById('log-type').value;
+                    if(this.temp.logEditImg === 'REMOVE') { delete log.img; delete log.sig; }
+                    else if(this.temp.logEditImg) { log.img = this.temp.logEditImg; }
+                }); 
+                this.closeModal('modal-log-editor'); this.renderAdvHistory(); 
+            },
+            delLog: function(idx) { if(!confirm('Delete Log?')) return; this.atomicUpdate((data) => { data.history.splice(idx, 1); }); this.renderAdvHistory(); },
+
+            refreshUI: function() {
+                const today = new Date().toLocaleDateString();
+                const total = this.data.list.reduce((a,b)=>a+b.qty,0);
+                const inC = this.data.history.filter(h=>new Date(h.ts).toLocaleDateString()===today && h.type==='IN').length;
+                const outC = this.data.history.filter(h=>new Date(h.ts).toLocaleDateString()===today && h.type==='OUT').length;
+                document.getElementById('stat-total').innerText = total; document.getElementById('stat-in').innerText = inC; document.getElementById('stat-out').innerText = outC;
+                const names = [...new Set(this.data.list.map(i=>i.name))];
+                document.getElementById('name-list').innerHTML = names.map(n=>`<option value="${n}">`).join('');
+                if(document.getElementById('view-items').style.display === 'block') this.renderList();
+                
+                if (this.userRole === 'manager') {
+                    document.getElementById('nav-in').style.display = this.settings.perms.in ? 'flex' : 'none';
+                    document.getElementById('nav-out').style.display = this.settings.perms.out ? 'flex' : 'none';
+                    if (!this.settings.perms.in && document.getElementById('view-in').classList.contains('active')) app.nav('dash');
+                    if (!this.settings.perms.out && document.getElementById('view-out').classList.contains('active')) app.nav('dash');
+                } else {
+                    document.getElementById('nav-in').style.display = 'flex';
+                    document.getElementById('nav-out').style.display = 'flex';
+                }
+
+                const rf = this.data.settings.reqFields;
+                const toggleGroup = (id, show, starId) => {
+                    document.getElementById(id).style.display = show ? 'block' : 'none';
+                    if(starId) document.getElementById(starId).style.display = show ? 'inline' : 'none';
+                };
+                toggleGroup('grp-in-unit', rf.unit, 'req-star-unit');
+                // Merged Group
+                document.getElementById('grp-in-fixed-asset').style.display = rf.fixedAsset ? 'flex' : 'none';
+                document.getElementById('req-star-fixed-asset').style.display = rf.fixedAsset ? 'inline' : 'none';
+                
+                toggleGroup('grp-in-attr', rf.attr, 'req-star-attr');
+                toggleGroup('grp-in-remark', rf.remark, 'req-star-remark');
+                toggleGroup('grp-in-loc', rf.location, 'req-star-loc');
+                toggleGroup('grp-in-photo', rf.photo, 'req-star-photo');
+                toggleGroup('grp-out-receiver', rf.receiver, 'req-star-receiver');
+                toggleGroup('grp-out-sign', rf.sign, 'req-star-sign');
+            },
+            renderList: function() {
+                const s = document.getElementById('search').value.toLowerCase();
+                const c = document.getElementById('filter').value;
+                document.getElementById('list-body').innerHTML = this.data.list.filter(i => (c==='ALL'||i.cat===c) && i.name.toLowerCase().includes(s))
+                    .map(i => {
+                        const fixedIcon = i.isFixed === "1" ? '<i class="fas fa-lock" style="color:#94a3b8;font-size:10px"></i>' : '';
+                        return `<tr><td><b>${i.name}</b> ${fixedIcon}</td><td><span style="font-weight:700">${i.qty}</span></td><td><span style="font-size:11px;color:#64748b">${i.loc||'-'}</span></td><td>${i.isFixed==="1"?this.t('val_yes'):'-'}</td></tr>`;
+                    }).join('');
+            },
+            checkStock: function(val) { const item = this.data.list.find(i=>i.name===val); document.getElementById('stock-hint').innerText = item ? `${this.t('col_qty')}: ${item.qty} (Loc: ${item.loc||'-'})` : ''; },
+            nav: function(v) { document.querySelectorAll('.view-container').forEach(e=>e.classList.remove('active')); document.getElementById('view-'+v).classList.add('active'); document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active')); document.getElementById('nav-'+v).classList.add('active'); if(v==='items') this.renderList(); },
+            handleFile: function(inp, t) { const f = inp.files[0]; if(f) { const r = new FileReader(); r.onload = (e) => { this.temp.img = e.target.result; document.getElementById('in-img-p').src = this.temp.img; document.getElementById('in-img-p').classList.remove('hidden'); }; r.readAsDataURL(f); } },
+            openSign: function() { document.getElementById('modal-sign').style.display='flex'; setTimeout(()=>{ const c = document.getElementById('sig-c'); c.width = c.offsetWidth; c.height = c.offsetHeight; const ctx = c.getContext('2d'); ctx.lineWidth=2; let isD=false; const getXY=(e)=>{ const r=c.getBoundingClientRect(); return {x:(e.touches?e.touches[0].clientX:e.clientX)-r.left, y:(e.touches?e.touches[0].clientY:e.clientY)-r.top}}; const start=(e)=>{isD=true;const p=getXY(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.preventDefault();}; const move=(e)=>{if(!isD)return;const p=getXY(e);ctx.lineTo(p.x,p.y);ctx.stroke();e.preventDefault();}; const end=()=>{isD=false;}; c.ontouchstart=start;c.ontouchmove=move;c.ontouchend=end; c.onmousedown=start;c.onmousemove=move;c.onmouseup=end; },100); },
+            saveSig: function() { const c = document.getElementById('sig-c'); this.temp.sig = c.toDataURL(); document.getElementById('out-sig-p').src = this.temp.sig; document.getElementById('out-sig-p').classList.remove('hidden'); this.closeModal('modal-sign'); },
+            clearSig: function() { const c=document.getElementById('sig-c'); c.getContext('2d').clearRect(0,0,c.width,c.height); },
+            
+            showDetail: function(t) {
+                if(t==='stock') return;
+                const today = new Date().toLocaleDateString();
+                const type = t==='in'?'IN':'OUT';
+                const list = this.data.history.filter(h => new Date(h.ts).toLocaleDateString() === today && h.type === type);
+                document.getElementById('dt-body').innerHTML = list.map(l => `<tr><td>${new Date(l.ts).toLocaleDateString()}</td><td>${type==='IN'?this.t('val_in'):this.t('val_out')}</td><td>${l.name}</td><td>${l.loc||'-'}</td><td>${l.isFixed==='1'?this.t('val_yes'):'-'}</td><td><b>${l.qty}</b></td></tr>`).join('');
+                document.getElementById('modal-detail').style.display='flex';
+            },
+            previewReport: function() {
+                const s=document.getElementById('r-start').value, e=document.getElementById('r-end').value;
+                const list = this.data.history.filter(h => { const d=new Date(h.ts).toISOString().split('T')[0]; return d>=s && d<=e; });
+                document.getElementById('dt-body').innerHTML = list.map(l => `<tr><td>${new Date(l.ts).toLocaleDateString()}</td><td>${l.type==='IN'?this.t('val_in'):this.t('val_out')}</td><td>${l.name}</td><td>${l.code||'-'}</td><td><b>${l.qty}</b></td><td>${l.remark||'-'}</td></tr>`).join('');
+                document.getElementById('modal-detail').style.display='flex';
+            },
+            
+            exportPDF: function() {
+                const start = document.getElementById('r-start').value;
+                const end = document.getElementById('r-end').value;
+                const list = this.data.history.filter(h => { const d=new Date(h.ts).toISOString().split('T')[0]; return d>=start && d<=end; }).reverse();
+                
+                const tbody = document.getElementById('pdf-table-body');
+                document.querySelectorAll('#pdf-export-container th').forEach(th => th.innerText = this.t(th.getAttribute('data-i18n')));
+
+                tbody.innerHTML = list.map(l => {
+                    const typeTrans = l.type==='IN' ? this.t('val_in') : (l.type==='OUT' ? this.t('val_out') : l.type);
+                    return `
+                    <tr>
+                        <td>${new Date(l.ts).toLocaleDateString()}</td>
+                        <td>${typeTrans}</td>
+                        <td>${l.name}</td>
+                        <td style="font-weight:bold;">${l.qty}</td>
+                        <td>${l.loc||''}</td>
+                        <td>${l.isFixed==='1'?'Y':'N'}</td>
+                        <td>${l.remark||(l.info||'')}</td>
+                        <td>${l.img ? '<img src="'+l.img+'" style="height:30px;">' : (l.sig ? '<img src="'+l.sig+'" style="height:20px;">' : '')}</td>
+                    </tr>
+                `}).join('');
+                document.getElementById('pdf-date-range').innerText = `Date: ${start} to ${end}`;
+                this.loading(true); this.toast("Generating PDF...", "info");
+                
+                const element = document.getElementById('pdf-export-container'); element.style.top = '0';
+                html2canvas(element, { scale: 2 }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf; const pdf = new jsPDF('p', 'mm', 'a4'); const imgProps = pdf.getImageProperties(imgData); const pdfWidth = pdf.internal.pageSize.getWidth(); const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width; pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight); pdf.save('KMC_Report.pdf');
+                    element.style.top = '-9999px'; this.loading(false); this.toast("PDF Downloaded", "success");
+                }).catch(err => { element.style.top = '-9999px'; this.loading(false); this.toast("PDF Error", "error"); });
+            },
+
+            exportExcel: function() {
+                const s=document.getElementById('r-start').value, e=document.getElementById('r-end').value;
+                const list = this.data.history.filter(h => { const d=new Date(h.ts).toISOString().split('T')[0]; return d>=s && d<=e; });
+                const headers = { Date: this.t('col_date'), Type: this.t('col_type'), Name: this.t('col_name'), Code: this.t('col_code'), Unit: this.t('unit'), Attr: this.t('attr'), Location: this.t('loc'), Fixed: this.t('fixed_asset'), Qty: this.t('col_qty'), Remark: this.t('col_remark') };
+                const data = list.map(l => {
+                    let row = {}; row[headers.Date] = new Date(l.ts).toLocaleString(); row[headers.Type] = l.type==='IN' ? this.t('val_in') : (l.type==='OUT' ? this.t('val_out') : l.type); row[headers.Name] = l.name; row[headers.Code] = l.code||''; row[headers.Unit] = l.unit||''; row[headers.Attr] = l.attr||''; row[headers.Location] = l.loc||''; row[headers.Fixed] = l.isFixed==='1' ? this.t('val_yes') : this.t('val_no'); row[headers.Qty] = l.qty; row[headers.Remark] = l.remark||(l.info||''); return row;
+                });
+                const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); XLSX.writeFile(wb, "Report.xlsx");
+            },
+
+            closeModal: function(id) { document.getElementById(id).style.display='none'; },
+            loading: function(show) { document.getElementById('loading').style.display=show?'flex':'none'; },
+            toast: function(m,t='success') { const b=document.getElementById('toast-box'); b.innerHTML=`<div class="toast ${t}">${m}</div>`; setTimeout(()=>b.innerHTML='',2500); },
+            toggleLang: function() { this.lang = this.lang==='zh'?'en':'zh'; this.i18n(); this.updateDeptDropdown(); this.refreshUI(); },
+            i18n: function() {
+                document.querySelectorAll('[data-i18n]').forEach(e => e.innerText = this.t(e.getAttribute('data-i18n')));
+                document.querySelectorAll('[data-placeholder]').forEach(e => e.placeholder = this.t(e.getAttribute('data-placeholder')));
+                const fixedOpts = document.getElementById('in-fixed').options; fixedOpts[0].text = this.t('val_no'); fixedOpts[1].text = this.t('val_yes');
+                const editorFixedOpts = document.getElementById('editor-fixed').options; editorFixedOpts[0].text = this.t('val_no'); editorFixedOpts[1].text = this.t('val_yes');
+                const f = document.getElementById('filter'); if(f) f.options[0].text = this.t('val_all');
+                if(this.user) document.getElementById('role-badge').innerText = this.t('role_' + this.user.role);
+            }
+        };
+        window.onload = ()=>app.init();
+    </script>
+</body>
+</html>
